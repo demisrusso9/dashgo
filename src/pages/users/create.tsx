@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Divider,
-  Flex,
-  Heading,
-  HStack,
-  SimpleGrid,
-  VStack
-} from '@chakra-ui/react'
+import { Box, Button, Divider, Flex, Heading, HStack, SimpleGrid, VStack } from '@chakra-ui/react'
 import { Input } from '../../components/Form/Input'
 import { Sidebar } from '../../components/Sidebar'
 import { Header } from '../../components/Header'
@@ -15,6 +6,10 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
+import { useMutation } from '@tanstack/react-query'
+import { api } from '../../services/api'
+import { queryClient } from '../../services/queryClient'
+import { useRouter } from 'next/router'
 
 interface CreateUserFormData {
   name: string
@@ -27,13 +22,8 @@ export default function CreateUser() {
   const schema = yup.object().shape({
     name: yup.string().required('Preencha seu nome completo'),
     email: yup.string().required('E-mail obrigatório').email('E-mail inválido'),
-    password: yup
-      .string()
-      .required('Senha obrigatória')
-      .min(4, 'No mínimo 4 carateres'),
-    password_confirmation: yup
-      .string()
-      .oneOf([null, yup.ref('password')], 'As senhas precisam ser iguais')
+    password: yup.string().required('Senha obrigatória').min(4, 'No mínimo 4 carateres'),
+    password_confirmation: yup.string().oneOf([null, yup.ref('password')], 'As senhas precisam ser iguais')
   })
 
   const {
@@ -44,8 +34,30 @@ export default function CreateUser() {
     resolver: yupResolver(schema)
   })
 
+  const createUser = useMutation(
+    async (user: CreateUserFormData) => {
+      const res = await api.post('users', {
+        user: {
+          ...user,
+          created_at: new Date()
+        }
+      })
+
+      return res.data.user
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['users'])
+      }
+    }
+  )
+
+  const router = useRouter()
+
   const handleCreateUser = async (data: CreateUserFormData) => {
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    console.log({register});
+    await createUser.mutateAsync(data)
+    router.push('/users')
   }
 
   return (
@@ -71,18 +83,8 @@ export default function CreateUser() {
 
           <VStack spacing={['6', '8']}>
             <SimpleGrid minChildWidth='240px' spacing={['6', '8']} w='100%'>
-              <Input
-                error={errors.name}
-                name='name'
-                label='Nome Completo'
-                {...register('name')}
-              />
-              <Input
-                error={errors.email}
-                name='email'
-                label='E-mail'
-                {...register('email')}
-              />
+              <Input error={errors.name} name='name' label='Nome Completo' {...register('name')} />
+              <Input error={errors.email} name='email' label='E-mail' {...register('email')} />
             </SimpleGrid>
 
             <SimpleGrid minChildWidth='240px' spacing={['6', '8']} w='100%'>
@@ -111,12 +113,7 @@ export default function CreateUser() {
                 </Button>
               </Link>
 
-              <Button
-                type='submit'
-                isLoading={isSubmitting}
-                colorScheme='teal'
-                w={['full', '32']}
-              >
+              <Button type='submit' isLoading={isSubmitting} colorScheme='teal' w={['full', '32']}>
                 Salvar
               </Button>
             </HStack>
